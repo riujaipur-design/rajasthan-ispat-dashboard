@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rajasthan Ispat Udhyog Group - Live Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; }
+        body { background-color: #f0f4f8; color: #1a202c; padding: 25px; }
+        .container { max-width: 1500px; margin: 0 auto; }
+        header { 
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
+            color: white; padding: 25px; border-radius: 12px; margin-bottom: 25px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
+        }
+        header h1 { font-size: 26px; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; }
+        .upload-section {
+            background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            text-align: center; margin-bottom: 25px; border: 3px dashed #cbd5e1;
+        }
+        .btn-upload {
+            border: 2px solid #2563eb; color: white; background-color: #2563eb;
+            padding: 12px 24px; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer;
+        }
+        .kpi-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 25px; display: none; }
+        .kpi-card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.02); border-left: 5px solid #2563eb; }
+        .kpi-card.balance-card { border-left-color: #10b981; }
+        .kpi-title { font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase; margin-bottom: 5px; }
+        .kpi-value { font-size: 22px; font-weight: 700; color: #1e293b; }
+        .search-wrapper { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); margin-bottom: 25px; display: none; }
+        .search-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; align-items: end; }
+        .search-box { display: flex; flex-direction: column; }
+        .search-box label { font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; margin-bottom: 6px; }
+        .search-input { width: 100%; padding: 10px 12px; font-size: 14px; border: 2px solid #e2e8f0; border-radius: 8px; outline: none; background-color: #f8fafc; }
+        .table-container { background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.04); overflow: hidden; display: none; }
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        th { background-color: #1e293b; color: #f8fafc; font-weight: 600; padding: 14px; font-size: 12px; text-transform: uppercase; }
+        td { padding: 14px; font-size: 14px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+        tr:hover { background-color: #f8fafc; }
+        
+        .badge-status { padding: 4px 10px; border-radius: 5px; font-weight: 700; font-size: 12px; display: inline-block; }
+        .status-balance { background-color: #e6fffa; color: #00a389; border: 1px solid #b2f5ea; }
+        .status-pack { background-color: #feebc8; color: #c05621; border: 1px solid #fbd38d; }
+        .status-cutting { background-color: #e2e8f0; color: #4a5568; border: 1px solid #cbd5e1; }
+        
+        .pcs-container { display: flex; flex-direction: column; gap: 4px; margin-top: 5px; }
+        .pcs-box { background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+        .pcs-highlight { color: #dc2626; font-weight: 700; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Rajasthan Ispat Udhyog Group</h1>
+        <p>Live Auto-Refresh Stock Dashboard</p>
+    </header>
+
+    <div class="upload-section">
+        <div style="position: relative; overflow: hidden; display: inline-block;">
+            <button class="btn-upload">📁 Click to Select Excel File</button>
+            <input type="file" id="excelFile" accept=".xlsx, .xlsm, .xls" style="position:absolute; left:0; top:0; opacity:0; width:100%; height:100%; cursor:pointer;" onchange="handleFile(this.files)">
+        </div>
+        <div id="fileInfo" style="margin-top: 15px; font-weight: bold; color: #1e3c72; font-size: 14px;">Koi file selected nahi hai. Apni file choose karein.</div>
+    </div>
+
+    <div id="errorBox" style="display:none; background-color:#fff5f5; color:#c53030; padding:15px; border-radius:8px; margin-bottom:25px; border:1px solid #fed7d7; font-weight:500;"></div>
+
+    <div class="kpi-container" id="kpiContainer">
+        <div class="kpi-card"><div class="kpi-title">Total Active Coils</div><div id="statRows" class="kpi-value">0</div></div>
+        <div class="kpi-card"><div class="kpi-title">Total Qty (MT)</div><div id="statTotalQty" class="kpi-value">0.000</div></div>
+        <div class="kpi-card balance-card"><div class="kpi-title">Total Balance Weight</div><div id="statTotalBal" class="kpi-value">0.000</div></div>
+    </div>
+
+    <div class="search-wrapper" id="searchWrapper">
+        <div class="search-grid">
+            <div class="search-box"><label>Coil No.</label><input type="text" id="sCoil" class="search-input" placeholder="Coil No..." oninput="filterData()"></div>
+            <div class="search-box"><label>Thickness</label><input type="text" id="sThick" class="search-input" placeholder="Ex: 3.15" oninput="filterData()"></div>
+            <div class="search-box"><label>Width</label><input type="text" id="sWidth" class="search-input" placeholder="Ex: 1250" oninput="filterData()"></div>
+            <div class="search-box"><label>Status</label><input type="text" id="sStatus" class="search-input" placeholder="Balance / Pack / Cutting" oninput="filterData()"></div>
+        </div>
+    </div>
+
+    <div class="table-container" id="tableContainer">
+        <table>
+            <thead>
+                <tr>
+                    <th>Coil No.</th>
+                    <th>Thickness</th>
+                    <th>Width</th>
+                    <th>Grade</th>
+                    <th>Coil Qty (MT)</th>
+                    <th>Balance Weight</th>
+                    <th>Current Weight Status & Packs</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    let globalData = [];
+    
+    // Safely check if XLSX library loaded properly
+    window.onload = function() {
+        if(typeof XLSX === 'undefined') {
+            showError("⚠️ Browser Warning: Internet script block ho rha hai. Internet connect karke page refresh karein.");
+        }
+    };
+
+    function showError(msg) {
+        const eBox = document.getElementById('errorBox');
+        eBox.style.display = 'block';
+        eBox.innerHTML = msg;
+    }
+
+    function handleFile(files) {
+        if(files.length === 0) return;
+        document.getElementById('errorBox').style.display = 'none';
+        document.getElementById('fileInfo').innerText = "⏳ Reading all tabs and processing data...";
+        
+        const file = files[0];
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                
+                // Find correct sheet (Looks for Sheet1 or the one containing most rows)
+                let targetSheet = workbook.Sheets[workbook.SheetNames[0]];
+                for (let name of workbook.SheetNames) {
+                    if (name.toLowerCase().includes("sheet") || name.toLowerCase().includes("stock") || name.toLowerCase().includes("cutter")) {
+                        targetSheet = workbook.Sheets[name];
+                        break;
+                    }
+                }
+                
+                const jsonData = XLSX.utils.sheet_to_json(targetSheet, { defval: "" });
+                
+                if(jsonData.length === 0) {
+                    showError("⚠️ Error: Is sheet mein data nahi mila. Kripya check karein ki data pehle tab par hi ho.");
+                    return;
+                }
+                
+                processExcelData(jsonData);
+                document.getElementById('fileInfo').innerText = "✅ Live Data Loaded! Connected File: " + file.name;
+            } catch(err) {
+                showError("⚠️ File parse error: Excel formatting support nahi ho rahi hai.");
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    function processExcelData(rawRows) {
+        globalData = [];
+        
+        rawRows.forEach(row => {
+            // Flexible matching for key column headers
+            let coil = String(row['Coil No.'] || row['CoilNo'] || row['COIL NO'] || '').trim();
+            if(!coil || coil === "nan" || coil === "TOTAL" || coil.toLowerCase().includes("total")) return;
+
+            let thick = parseFloat(row['Thick In Mm'] || row['Thickness'] || row['THICK']) || 0;
+            let width = parseFloat(row['Width In Mm'] || row['Width'] || row['WIDTH']) || 0;
+            let grade = String(row['GRADE'] || row['Grade'] || '-').trim();
+            let qty = parseFloat(row['Qty. In M.T.'] || row['Qty'] || row['QTY']) || 0;
+            let bal = parseFloat(row['Balance Weight'] || row['Balance'] || row['BALANCE WEIGHT']) || 0;
+
+            let pcs = [];
+            
+            // Check Main Cutting Size Slot
+            let size1 = parseFloat(row['CUTTING SIZE'] || row['Cutting Size']);
+            let bal1 = parseFloat(row['BALANCE'] || row['Balance']);
+            if(size1 > 0 && bal1 > 0) pcs.push({ size: parseInt(size1), p: parseInt(bal1) });
+            
+            // Dynamic slots A, B, C, D
+            ['A', 'B', 'C', 'D'].forEach((char, index) => {
+                let s = parseFloat(row[char]);
+                let b = parseFloat(row[char + (index === 0 ? '1' : '2')]);
+                if(s > 0 && b > 0) pcs.push({ size: parseInt(s), p: parseInt(b) });
+            });
+
+            // 3-Way Core Status Conditions matching your guidelines
+            let statusStr = "BALANCE";
+            if (pcs.length === 0 && Math.abs(qty - bal) < 0.02) {
+                statusStr = "BALANCE"; // Pure fresh uncut coil (15.8 Qty & 15.8 Balance)
+            } else if (bal <= 0.005) {
+                statusStr = "PACK CUTTING"; // Full coil consumed
+            } else {
+                statusStr = "CUTTING"; // Partial cutting done, weight remaining (e.g. 15.8 Qty -> 3.4 Remaining)
+            }
+
+            globalData.push({ coil, thick, width, grade, qty, bal, pcs_data: pcs, status: statusStr });
+        });
+
+        if(globalData.length === 0) {
+            showError("⚠️ Columns name nahi mil rahe! Make sure sheet mein 'Coil No.', 'Thick In Mm' aur 'Qty. In M.T.' sahi likha ho.");
+            return;
+        }
+
+        document.getElementById('kpiContainer').style.display = 'grid';
+        document.getElementById('searchWrapper').style.display = 'block';
+        document.getElementById('tableContainer').style.display = 'block';
+        filterData();
+    }
+
+    function filterData() {
+        const cQ = document.getElementById('sCoil').value.trim().toLowerCase();
+        const tQ = document.getElementById('sThick').value.trim().toLowerCase();
+        const wQ = document.getElementById('sWidth').value.trim().toLowerCase();
+        const sQ = document.getElementById('sStatus').value.trim().toLowerCase();
+
+        let filtered = globalData.filter(item => {
+            const mCoil = item.coil.toLowerCase().includes(cQ);
+            const mThick = item.thick.toFixed(2).includes(tQ);
+            const mWidth = item.width.toFixed(2).includes(wQ);
+            const mStatus = item.status.toLowerCase().includes(sQ);
+            return mCoil && mThick && mWidth && mStatus;
+        });
+
+        let tQty = 0; let tBal = 0;
+        const tbody = document.getElementById('tableBody');
+        tbody.innerHTML = '';
+
+        filtered.forEach(row => {
+            tQty += row.qty; tBal += row.bal;
+            
+            let badge = "";
+            if(row.status === "BALANCE") {
+                badge = `<span class="badge-status status-balance">📦 BALANCE (Fresh)</span>`;
+            } else if(row.status === "PACK CUTTING") {
+                badge = `<span class="badge-status status-pack">✂️ PACK CUTTING</span>`;
+            } else {
+                badge = `<span class="badge-status status-cutting">⚙️ CUTTING (Running)</span>`;
+            }
+
+            let pcsHtml = '<div class="pcs-container">';
+            if(row.pcs_data.length > 0) {
+                row.pcs_data.forEach(p => { 
+                    pcsHtml += `<div class="pcs-box">📏 <b>${p.size} mm</b> &rarr; <span class="pcs-highlight">${p.p} Pcs Balance</span></div>`; 
+                });
+            } else {
+                pcsHtml += `<div style="color:#718096; font-size:12px; font-style:italic;">Fresh uncut block</div>`;
+            }
+            pcsHtml += '</div>';
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><b>${row.coil}</b></td>
+                <td>${row.thick.toFixed(2)}</td>
+                <td>${row.width.toFixed(2)}</td>
+                <td><span style="background:#e2e8f0; padding:2px 6px; border-radius:4px; font-size:12px;">${row.grade}</span></td>
+                <td style="color:#2563eb; font-weight:bold;">${row.qty.toFixed(3)}</td>
+                <td style="color:#10b981; font-weight:bold;">${row.bal.toFixed(3)}</td>
+                <td>${badge}${pcsHtml}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        document.getElementById('statRows').innerText = filtered.length;
+        document.getElementById('statTotalQty').innerText = tQty.toFixed(3) + " MT";
+        document.getElementById('statTotalBal').innerText = tBal.toFixed(3) + " MT";
+    }
+</script>
+</body>
+</html>
